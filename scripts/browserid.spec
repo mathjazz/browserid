@@ -1,8 +1,8 @@
 %define _rootdir /opt/browserid
 
 Name:          browserid-server
-Version:       0.2012.04.11
-Release:       1%{?dist}_%{svnrev}
+Version:       0.2012.03.28
+Release:       2%{?dist}_%{svnrev}
 Summary:       BrowserID server
 Packager:      Pete Fritchman <petef@mozilla.com>
 Group:         Development/Libraries
@@ -38,6 +38,7 @@ for f in bin lib locale node_modules resources scripts *.json; do
 done
 mkdir -p %{buildroot}%{_rootdir}/config
 cp -p config/l10n-all.json %{buildroot}%{_rootdir}/config
+cp -p config/l10n-prod.json %{buildroot}%{_rootdir}/config
 
 %clean
 rm -rf %{buildroot}
