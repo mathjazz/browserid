@@ -1,8 +1,8 @@
 %define _rootdir /opt/browserid
 
 Name:          browserid-server
-Version:       0.2012.03.28
-Release:       2%{?dist}_%{svnrev}
+Version:       0.2012.05.09
+Release:       1%{?dist}_%{svnrev}
 Summary:       BrowserID server
 Packager:      Pete Fritchman <petef@mozilla.com>
 Group:         Development/Libraries

@@ -26,15 +26,18 @@ BrowserID.Modules.Actions = (function() {
       runningService = name;
     }
 
+    bid.resize();
+
     return module;
   }
 
-  function startRegCheckService(options, verifier, message) {
+  function startRegCheckService(options, verifier, message, password) {
     var controller = startService("check_registration", {
       email: options.email,
       required: options.required,
       verifier: verifier,
-      verificationMessage: message
+      verificationMessage: message,
+      password: password
     });
     controller.startCheck();
   }
@@ -71,8 +74,16 @@ BrowserID.Modules.Actions = (function() {
       if(onsuccess) onsuccess(null);
     },
 
+    doSetPassword: function(info) {
+      startService("set_password", info);
+    },
+
+    doStageUser: function(info) {
+      dialogHelpers.createUser.call(this, info.email, info.password, info.ready);
+    },
+
     doConfirmUser: function(info) {
-      startRegCheckService.call(this, info, "waitForUserValidation", "user_confirmed");
+      startRegCheckService.call(this, info, "waitForUserValidation", "user_confirmed", info.password || undefined);
     },
 
     doPickEmail: function(info) {
@@ -81,6 +92,10 @@ BrowserID.Modules.Actions = (function() {
 
     doAddEmail: function(info) {
       startService("add_email", info);
+    },
+
+    doStageEmail: function(info) {
+      dialogHelpers.addSecondaryEmailWithPassword.call(this, info.email, info.password, info.ready);
     },
 
     doAuthenticate: function(info) {
@@ -92,25 +107,15 @@ BrowserID.Modules.Actions = (function() {
     },
 
     doForgotPassword: function(info) {
-      startService("forgot_password", info);
+      startService("set_password", _.extend(info, { password_reset: true }));
     },
 
     doResetPassword: function(info) {
-      this.doConfirmUser(info);
+      dialogHelpers.resetPassword.call(this, info.email, info.password, info.ready);
     },
 
     doConfirmEmail: function(info) {
       startRegCheckService.call(this, info, "waitForEmailValidation", "email_confirmed");
-    },
-
-    doEmailConfirmed: function(info) {
-      var self=this;
-      // yay!  now we need to produce an assertion.
-      user.getAssertion(info.email, user.getOrigin(), function(assertion) {
-        self.publish("assertion_generated", {
-          assertion: assertion
-        });
-      }, self.getErrorDialog(errors.getAssertion));
     },
 
     doAssertionGenerated: function(info) {
@@ -158,8 +163,8 @@ BrowserID.Modules.Actions = (function() {
       startService("is_this_your_computer", info);
     },
 
-    doEmailChosen: function(info) {
-      startService("email_chosen", info);
+    doGenerateAssertion: function(info) {
+      startService("generate_assertion", info);
     }
   });
 

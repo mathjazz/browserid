@@ -76,7 +76,7 @@
     equal(label.hasClass("preselected"), false, "the label has no class");
   });
 
-  asyncTest("signIn - saves picked email to storage", function() {
+  asyncTest("signIn - trigger 'email_chosen message'", function() {
     storage.addEmail("testuser@testuser.com", {});
     storage.addEmail("testuser2@testuser.com", {});
 
@@ -87,7 +87,6 @@
     var assertion;
 
     register("email_chosen", function(msg, info) {
-      equal(storage.site.get(testOrigin, "email"), "testuser2@testuser.com", "email saved correctly");
       ok(info.email, "email_chosen message triggered with email");
       start();
     });
@@ -136,6 +135,17 @@
     // selects testuser+test0@testuser.com
     $(".inputs label:eq(0)").trigger("click");
     equal($("#email_0").is(":checked"), true, "radio button is correctly selected");
+  });
+
+  asyncTest("click on not me button - trigger notme message", function() {
+    createController();
+
+    register("notme", function(msg, info) {
+      ok(true, "notme triggered");
+      start();
+    });
+
+    $("#thisIsNotMe").click();
   });
 
 }());

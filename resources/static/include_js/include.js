@@ -958,41 +958,53 @@
       }
     }
 
-    var commChan;
+    var commChan,
+        browserSupported = BrowserSupport.isSupported();
 
     // this is for calls that are non-interactive
     function _open_hidden_iframe() {
-      if (!commChan) {
-        var doc = window.document;
-        var iframe = doc.createElement("iframe");
-        iframe.style.display = "none";
-        doc.body.appendChild(iframe);
-        iframe.src = ipServer + "/communication_iframe";
-        commChan = Channel.build({
-          window: iframe.contentWindow,
-          origin: ipServer,
-          scope: "mozid_ni",
-          onReady: function() {
-            // once the channel is set up, we'll fire a loaded message.  this is the
-            // cutoff point where we'll say if 'setLoggedInUser' was not called before
-            // this point, then it wont be called (XXX: optimize and improve me)
-            commChan.call({
-              method: 'loaded',
-              success: function(){
-                if (observers.ready) observers.ready();
-              }, error: function() {
-              }
-            });
-          }
-        });
+      // If this is an unsupported browser, do not even attempt to add the
+      // IFRAME as doing so will cause an exception to be thrown in IE6 and IE7
+      // from within the communication_iframe.
+      if(!browserSupported) return;
 
-        commChan.bind('logout', function(trans, params) {
-          if (observers.logout) observers.logout();
-        });
+      try {
+        if (!commChan) {
+          var doc = window.document;
+          var iframe = doc.createElement("iframe");
+          iframe.style.display = "none";
+          doc.body.appendChild(iframe);
+          iframe.src = ipServer + "/communication_iframe";
+          commChan = Channel.build({
+            window: iframe.contentWindow,
+            origin: ipServer,
+            scope: "mozid_ni",
+            onReady: function() {
+              // once the channel is set up, we'll fire a loaded message.  this is the
+              // cutoff point where we'll say if 'setLoggedInUser' was not called before
+              // this point, then it wont be called (XXX: optimize and improve me)
+              commChan.call({
+                method: 'loaded',
+                success: function(){
+                  if (observers.ready) observers.ready();
+                }, error: function() {
+                }
+              });
+            }
+          });
 
-        commChan.bind('login', function(trans, params) {
-          if (observers.login) observers.login(params);
-        });
+          commChan.bind('logout', function(trans, params) {
+            if (observers.logout) observers.logout();
+          });
+
+          commChan.bind('login', function(trans, params) {
+            if (observers.login) observers.login(params);
+          });
+        }
+      } catch(e) {
+        // channel building failed!  let's ignore the error and allow higher
+        // level code to handle user messaging.
+        commChan = undefined;
       }
     }
 
@@ -1006,16 +1018,22 @@
         throw "non-function where function expected in parameters to navigator.id.watch()";
       }
 
+      if (!options.onlogin) throw "'onlogin' is a required argument to navigator.id.watch()";
+      if (!options.onlogout) throw "'onlogout' is a required argument to navigator.id.watch()";
+
       observers.login = options.onlogin || null;
       observers.logout = options.onlogout || null;
       observers.ready = options.onready || null;
 
       _open_hidden_iframe();
 
-      if (typeof options.email !== 'undefined') {
+      // check that the commChan was properly initialized before interacting with it.
+      // on unsupported browsers commChan might still be undefined, in which case
+      // we let the dialog display the "unsupported browser" message upon spawning.
+      if (typeof options.loggedInEmail !== 'undefined' && commChan) {
         commChan.notify({
           method: 'loggedInUser',
-          params: options.email
+          params: options.loggedInEmail
         });
       }
     }
@@ -1083,36 +1101,38 @@
           }
         }
 
-        // complete
-        if (options && options.onclose) options.onclose();
-        delete options.onclose;
+        // if either err indicates the user canceled the signin (expected) or a
+        // null response was sent (unexpected), invoke the .oncancel() handler.
+        if (err === 'client closed window' || !r) {
+          if (options && options.oncancel) options.oncancel();
+          delete options.oncancel;
+        }
       });
     };
 
     navigator.id = {
-      // The experimental API, not yet final
-      experimental: {
-        request: function(options) {
-          checkCompat(false);
-          return internalRequest(options);
-        },
-        watch: function(options) {
-          checkCompat(false);
-          internalWatch(options);
-        }
+      request: function(options) {
+        options = options || {};
+        checkCompat(false);
+        return internalRequest(options);
+      },
+      watch: function(options) {
+        checkCompat(false);
+        internalWatch(options);
       },
       // logout from the current website
-      // NOTE: callback argument will be deprecated when experimental API lands, to
-      //       be replaced with the .onlogout observer of the watch api.
+      // The callback parameter is DEPRECATED, instead you should use the
+      // the .onlogout observer of the .watch() api.
       logout: function(callback) {
         // allocate iframe if it is not allocated
         _open_hidden_iframe();
-        // send logout message
-        commChan.notify({ method: 'logout' });
+        // send logout message if the commChan exists
+        if (commChan) commChan.notify({ method: 'logout' });
         if (typeof callback === 'function') setTimeout(callback, 0);
       },
       // get an assertion
       get: function(callback, options) {
+        options = options || {};
         checkCompat(true);
         internalWatch({
           onlogin: function(assertion) {
@@ -1120,14 +1140,15 @@
               callback(assertion);
               callback = null
             }
-          }
+          },
+          onlogout: function() {}
         });
-        options.onclose = function() {
+        options.oncancel = function() {
           if (callback) {
             callback(null);
             callback = null;
           }
-          internalWatch({});
+          observers.login = observers.logout = observers.ready = null;
         };
         if (options && options.silent) {
           if (callback) setTimeout(function() { callback(null); }, 0);

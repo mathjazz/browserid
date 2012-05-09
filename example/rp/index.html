@@ -105,6 +105,15 @@ pre {
 <script src="https://browserid.org/include.js"></script>
 <script>
 
+try {
+  var storage = localStorage;
+}
+catch(e) {
+  // Fx with cookies disabled with blow up when trying to access localStorage.
+  storage = {};
+}
+
+
 function loggit() {
   try {
     console.log.apply(console, arguments);
@@ -134,8 +143,8 @@ function checkAssertion(assertion) {
   });
 };
 
-navigator.id.experimental.watch({
-  email: (localStorage.loggedInUser === 'null') ? null : localStorage.loggedInUser,
+navigator.id.watch({
+  loggedInEmail: (storage.loggedInUser === 'null') ? null : storage.loggedInUser,
   onready: function () {
     loggit("onready");
     var txt = serial++ + ' navigator.id ready at ' + (new Date).toString();
@@ -148,6 +157,8 @@ navigator.id.experimental.watch({
     $(".loginEvents > pre").text(txt);
 
     checkAssertion(assertion);
+
+    $(".specify button.assertion").removeAttr('disabled');
   },
   onlogout: function () {
     loggit("onlogout");
@@ -158,19 +169,23 @@ navigator.id.experimental.watch({
 
 $(document).ready(function() {
   $(".specify button.assertion").click(function() {
-    $("pre").text("... waiting ...");
-
     var requiredEmail = $.trim($('#requiredEmail').val());
     if (!requiredEmail.length) requiredEmail = undefined;
+    if (requiredEmail && requiredEmail.indexOf('@') === -1) {
+      alert('Invalid Email in "Require a specific email" field. Adding @example.com');
+      $('#requiredEmail').val(requiredEmail + '@example.com');
+      $('#requiredEmail').focus();
+      return;
+    }
 
     $(".specify button.assertion").attr('disabled', 'true');
 
-    navigator.id.experimental.request({
+    navigator.id.request({
       privacyURL: $('#privacy').attr('checked') ? "/privacy.html" : undefined,
       tosURL: $('#tos').attr('checked') ? "/TOS.html" : undefined,
       requiredEmail: requiredEmail,
-      onclose: function() {
-        loggit("onclose");
+      oncancel: function() {
+        loggit("oncancel");
         $(".specify button.assertion").removeAttr('disabled');
       }
     });
@@ -179,10 +194,10 @@ $(document).ready(function() {
   $(".specify button.logout").click(navigator.id.logout);
 
   $(".session button.update_session").click(function() {
-    localStorage.loggedInUser = $.trim($('#loggedInUser').val());
+    storage.loggedInUser = $.trim($('#loggedInUser').val());
     $(".session input").fadeOut(100).fadeIn(350);
   });
-  $('#loggedInUser').val(localStorage.loggedInUser ? localStorage.loggedInUser : "");
+  $('#loggedInUser').val(storage.loggedInUser ? storage.loggedInUser : "");
 });
 
 </script>

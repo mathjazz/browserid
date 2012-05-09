@@ -51,7 +51,8 @@ suite.addBatch({
   "start registration": {
     topic: wsapi.post('/wsapi/stage_user', {
       email: 'first@fakeemail.com',
-      site:'fakesite.com'
+      pass: 'firstfakepass',
+      site:'https://fakesite.com'
     }),
     "returns 200": function(err, r) {
       assert.strictEqual(r.code, 200);
@@ -110,7 +111,7 @@ suite.addBatch({
 suite.addBatch({
   "completing user creation": {
     topic: function() {
-      wsapi.post('/wsapi/complete_user_creation', { token: token, pass: 'firstfakepass' }).call(this);
+      wsapi.post('/wsapi/complete_user_creation', { token: token }).call(this);
     },
     "works": function(err, r) {
       assert.equal(r.code, 200);
@@ -170,7 +171,8 @@ suite.addBatch({
   "re-registering an existing email": {
     topic: wsapi.post('/wsapi/stage_user', {
       email: 'first@fakeemail.com',
-      site:'secondfakesite.com'
+      pass: 'secondfakepass',
+      site:'http://secondfakesite.com'
     }),
     "yields a HTTP 200": function (err, r) {
       assert.strictEqual(r.code, 200);
@@ -206,7 +208,7 @@ suite.addBatch({
 suite.addBatch({
   "proving email ownership causes account re-creation": {
     topic: function() {
-      wsapi.post('/wsapi/complete_user_creation', { token: token, pass: 'secondfakepass' }).call(this);
+      wsapi.post('/wsapi/complete_user_creation', { token: token }).call(this);
     },
     "and returns a 200 code": function(err, r) {
       assert.equal(r.code, 200);

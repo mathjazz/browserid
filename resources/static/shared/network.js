@@ -47,7 +47,8 @@ BrowserID.Network = (function() {
     // seed the PRNG
     // FIXME: properly abstract this out, probably by exposing a jwcrypto
     // interface for randomness
-    require("./libs/all").sjcl.random.addEntropy(result.random_seed);
+    // require("./libs/all").sjcl.random.addEntropy(result.random_seed);
+    // FIXME: this wasn't doing anything for real, so commenting this out for now
   }
 
   function withContext(cb, onFailure) {
@@ -157,6 +158,10 @@ BrowserID.Network = (function() {
       }, onFailure);
     },
 
+    withContext: function(onComplete, onFailure) {
+      withContext(onComplete, onFailure)
+    },
+
     /**
      * clear local cache, including authentication status and
      * other session data.
@@ -199,16 +204,18 @@ BrowserID.Network = (function() {
     /**
      * Create a new user.  Requires a user to verify identity.
      * @method createUser
-     * @param {string} email - Email address to prepare.
+     * @param {string} email
+     * @param {string} password
      * @param {string} origin - site user is trying to sign in to.
      * @param {function} [onComplete] - Callback to call when complete.
      * @param {function} [onFailure] - Called on XHR failure.
      */
-    createUser: function(email, origin, onComplete, onFailure) {
+    createUser: function(email, password, origin, onComplete, onFailure) {
       post({
         url: "/wsapi/stage_user",
         data: {
           email: email,
+          pass: password,
           site : origin
         },
         success: function(status) {
@@ -257,6 +264,14 @@ BrowserID.Network = (function() {
       get({
         url: "/wsapi/user_creation_status?email=" + encodeURIComponent(email),
         success: function(status, textStatus, jqXHR) {
+          if (status.status === 'complete' && status.userid) {
+            // The user at this point can ONLY be logged in with password
+            // authentication. Once the registration is complete, that means
+            // the server has updated the user's cookies and the user is
+            // officially authenticated.
+            auth_status = 'password';
+            setUserID(status.userid);
+          }
           complete(onComplete, status.status);
         },
         error: onFailure
@@ -267,7 +282,7 @@ BrowserID.Network = (function() {
      * Complete user registration, give user a password
      * @method completeUserRegistration
      * @param {string} token - token to register for.
-     * @param {string} password - password to register for account.
+     * @param {string} password
      * @param {function} [onComplete] - Called when complete.
      * @param {function} [onFailure] - Called on XHR failure.
      */
@@ -289,7 +304,7 @@ BrowserID.Network = (function() {
      * Call with a token to prove an email address ownership.
      * @method completeEmailRegistration
      * @param {string} token - token proving email ownership.
-     * @param {string} password - password to set if necessary.  If not necessary, set to undefined.
+     * @param {string} password
      * @param {function} [onComplete] - Callback to call when complete.  Called
      * with one boolean parameter that specifies the validity of the token.
      * @param {function} [onFailure] - Called on XHR failure.
@@ -311,13 +326,15 @@ BrowserID.Network = (function() {
     /**
      * Request a password reset for the given email address.
      * @method requestPasswordReset
-     * @param {string} email - email address to reset password for.
+     * @param {string} email
+     * @param {string} password
+     * @param {string} origin
      * @param {function} [onComplete] - Callback to call when complete.
      * @param {function} [onFailure] - Called on XHR failure.
      */
-    requestPasswordReset: function(email, origin, onComplete, onFailure) {
+    requestPasswordReset: function(email, password, origin, onComplete, onFailure) {
       if (email) {
-        Network.createUser(email, origin, onComplete, onFailure);
+        Network.createUser(email, password, origin, onComplete, onFailure);
       } else {
         // TODO: if no email is provided, then what?
         throw "no email provided to password reset";
@@ -336,6 +353,28 @@ BrowserID.Network = (function() {
         url: "/wsapi/set_password",
         data: {
           password: password
+        },
+        success: function(status) {
+          complete(onComplete, status.success);
+        },
+        error: onFailure
+      });
+    },
+
+    /**
+     * post interaction data
+     * @method setPassword
+     * @param {string} password - new password.
+     * @param {function} [onComplete] - Callback to call when complete.
+     * @param {function} [onFailure] - Called on XHR failure.
+     */
+    sendInteractionData: function(data, onComplete, onFailure) {
+      post({
+        url: "/wsapi/interaction_data",
+        data: {
+          // reminder, CSRF token will be inserted here by xhr.js, that's
+          // why this *must* be an object
+          data: data
         },
         success: function(status) {
           complete(onComplete, status.success);
@@ -405,16 +444,18 @@ BrowserID.Network = (function() {
     /**
      * Add a secondary email to the current user's account.
      * @method addSecondaryEmail
-     * @param {string} email - Email address to add.
-     * @param {string} origin - site user is trying to sign in to.
+     * @param {string} email
+     * @param {string} password
+     * @param {string} origin
      * @param {function} [onComplete] - called when complete.
      * @param {function} [onFailure] - called on xhr failure.
      */
-    addSecondaryEmail: function(email, origin, onComplete, onFailure) {
+    addSecondaryEmail: function(email, password, origin, onComplete, onFailure) {
       post({
         url: "/wsapi/stage_email",
         data: {
           email: email,
+          pass: password,
           site: origin
         },
         success: function(response) {
@@ -625,7 +666,10 @@ BrowserID.Network = (function() {
       withContext(function() {
         try {
           // set a test cookie with a duration of 1 second.
-          // NOTE - The Android 3.3 default browser will still pass this.
+          // NOTE - The Android 3.3 and 4.0 default browsers will still pass
+          // this check.  This causes the Android browsers to only display the
+          // cookies diabled error screen only after the user has entered and
+          // submitted input.
           // http://stackoverflow.com/questions/8509387/android-browser-not-respecting-cookies-disabled/9264996#9264996
           document.cookie = "test=true; max-age=1";
           var enabled = document.cookie.indexOf("test") > -1;

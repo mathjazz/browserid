@@ -44,6 +44,11 @@ html[xmlns] .cf {
 
 header, section, footer {
   display: block;
+  width: 100%;
+}
+
+ul, li {
+  list-style-type: none;
 }
 
 .sans {
@@ -80,6 +85,19 @@ a {
   text-decoration: none;
 }
 
+a:hover {
+  color: #000;
+}
+
+a.action, #error a {
+  color: #549FDC;
+  text-shadow: 1px 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+a.action:hover, #error a:hover {
+  color: #58a7e7;
+}
+
 p:last-child {
   margin-bottom: 0 !important;
 }
@@ -103,9 +121,6 @@ input[type=password] {
        -moz-box-shadow: 1px 1px 0 rgba(255,255,255,0.5);
          -o-box-shadow: 1px 1px 0 rgba(255,255,255,0.5);
             box-shadow: 1px 1px 0 rgba(255,255,255,0.5);
-
-    /* Fix webkit putting an inner box shadow on the input elements. Issue #1313 */
-    -webkit-appearance: caret;
 }
 
 input[type=email]:focus,
@@ -137,6 +152,7 @@ input[type=password]:disabled {
 input[type=radio],
 input[type=checkbox] {
   cursor: pointer;
+  margin-left: 2px; /* necessary or chrome cuts off part of the radio button */
 }
 
 button,
@@ -187,10 +203,10 @@ button:hover,
 button:focus,
 .button:hover,
 .button:focus{
+    color: #fff;
     background-color: #76c2ff;
     background-image: -moz-linear-gradient(center top , #76C2FF 50%, #37A6FF 100%);
     background-image: -webkit-gradient(linear, left top, left bottom, color-stop(50%, #76C2FF), color-stop(100%, #37A6FF));
-
 }
 
 button.negative:hover,
@@ -235,18 +251,7 @@ button[disabled], .submit_disabled button, .submit_disabled .button,
   opacity: .5;
 }
 
-#cancel, #back {
-  background-color: transparent;
-  color: #549FDC;
-  font-size: 1em;
-  font-weight: normal;
-  text-shadow: 1px 1px 0 rgba(255, 255, 255, 0.5);
-  padding: 0;
-}
-
-
-.submit #cancel,
-#signIn .submit #cancel {
+.submit #cancel {
   float: right;
   margin-right: 15px;
   line-height: 28px;
@@ -279,25 +284,15 @@ header ul li {
   float: left;
 }
 
-header a {
-  color: #222;
-}
-
 header a.home {
   width: 80px;
   height: 21px;
-  background-image: url('/i/icon.png');
-  display: block;
-  background-position: left 4px;
-  background-repeat: no-repeat;
-  text-indent: -999px;
+  background: url("/i/icon.png") 0px 4px no-repeat;
+  text-indent: -9999px;
+  display: inline-block;
 }
 
 footer {
-  color: #aaa;
-}
-
-footer a {
   color: #aaa;
 }
 
@@ -309,15 +304,12 @@ footer ul li {
 
 footer .help {
     float: right;
-    color: #62615F;
     cursor: help;
 }
 
 .cancelVerify {
   font-weight: bold;
 }
-
-
 
 #wait, #delay {
   background-color: #fff;
@@ -331,10 +323,6 @@ footer .help {
     color: #ff0000;
 }
 
-#error ul, #error li {
-    list-style-type: none;
-}
-
 #wait strong, #error strong, #delay strong {
     color: #222;
     font-weight: bold;
@@ -345,8 +333,17 @@ footer .help {
 }
 
 #error a {
-    color: #549FDC;
     text-decoration: underline;
+}
+
+.forgot {
+  color: #777;
+  text-shadow: 1px 1px 0 rgba(255, 255, 255, 0.5);
+  font-size: 11px;
+}
+
+.forgot:hover {
+  color: #333;
 }
 
 

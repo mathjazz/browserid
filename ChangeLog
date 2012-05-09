@@ -1,5 +1,43 @@
-train-2012.04.11 (in progress):
+train-2012.05.09 (in progress):
   *
+
+train-2012.04.27:
+  * Observer API updated, still experimental.
+  * A more responsive dialog design that scales to different screen sizes: #1101, #1317
+  * Improved consistency of links: #702, #1453
+  * Test improvements: #1246, #1437, #1488, #1464
+  * Allow underscores in email address domain and site origin: #1454
+  * Fixes to per site last-used-email state maintenence: #968
+  * Never ask a user if this "is your computer" in a session that involves email verificatino: #1446
+  * Remove placeholder text from change password inputs: #1461
+  * General cleanup: #1449, #1396
+  * Logging improvements: #1383
+  * IE visual improvements for error screens: #1485, #1390, #1496
+  * Improved checks for disabled cookies: #1418, #1484
+  * Fix bug where if user pauses for 2 minutes on "is this your computer" the generated assertion is invalid: #1460
+
+train-2012.04.11:
+  * New BrowserID "Observer" API implemented in experimental status: #912
+  * Implement variable length sessions and explicit user confirmation to improve saftey on public terminals/shared computers: #884
+  * keysize is now 1024: #1293
+  * fix case where removing the same email address twice could cancel your account: #1123
+  * give user feedback after typing in email while we're checking the email provider for BrowserID support: #1290
+  * optimize javascript resources: #1351
+  * frontend tests only output failures: #1326
+  * documentation fixes: #1367, #1401
+  * logging improvements: #1327
+  * improve experience for users with cookies disabled: #1402, #1201, #1202, #1414
+  * use http status codes in verifier where appropriate: #1362
+  * improve password update in account manager screen: #1388, #1389
+  * developers link now points to MDN: #1397
+  * fix issues that were introduced while implementing the above features: #1349, #1348, #1354, #1357, #1374, #1399, #1400, #1408, #1395, #1406, #1405, #1390, #1391
+  * (hotfix 2012.04.12) return 400 rather than 500 for invalid params to stage_user or stage_email: #1429
+  * (hotfix 2012.04.12) fix broken string, "is this your computer" was broken into two fragments: #1425
+  * (hotfix 2012.04.16) fix API regression that would cause javascript error when .get() invoked without second arg: #1442
+  * (hotfix 2012.04.16) update load_gen to new server apis that require an `ephemeral` argument: #1436
+  * (hotfix 2012.04.17) fix broken reset password flow - button was non-responsive in dialog: #1440
+  * (hotfix 2012.04.17) mitigate errors seen when adding a secondary email to an acct with only primary emails: #1445
+  * (hotfix 2012.04.18) fix error where under certain conditions user could see an error immediately after authenticating: #1449
 
 train-2012.03.28:
   * work towards better user messaging for when cookies are disabled: #1167, #1302
@@ -10,6 +48,12 @@ train-2012.03.28:
   * tools/build/dev env fixes: #1284
   * (hotfix 2012.03.30) Fix regression where 304 responses to requests for IFrame HTML would have X-Frame-Options: deny, preventing loading of iframes #1353
   * (hotfix 2012.03.30) ETag headers now vary by locale, fixes regression where switching between locales was broken #1364
+  * (hotfix 2012.04.10) more rigorous checking of email inputs to WSAPI
+  * (hotfix 2012.04.10) copy config/l10n-*.json to build directory
+  * (hotfix 2012.04.10) final 40 production locales merged: #1412
+  * (hotfix 2012.04.10) update l10n-all.json to have all locales (complete and in-progress) as well as en-US and db-LB
+  * (hotfix 2012.04.10) fix more rigorous checking of email inputs to WSAPI: domain checking of 'site' parameter was validating hostnames rather than domains.
+  * (hotfix 2012.04.12) fix /signup page on browserid.org: #1429
 
 train-2012.03.14:
   * BrowserID now speaks Bulgarian

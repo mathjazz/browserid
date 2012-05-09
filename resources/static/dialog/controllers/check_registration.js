@@ -18,12 +18,14 @@ BrowserID.Modules.CheckRegistration = (function() {
       options.required = !!options.required;
 
       self.renderWait("confirm_email", options);
+
       self.email = options.email;
       self.verifier = options.verifier;
       self.verificationMessage = options.verificationMessage;
+      self.required = options.required;
+      self.password = options.password;
 
       self.click("#back", self.back);
-      self.click("#cancel", self.cancel);
 
       Module.sc.start.call(self, options);
     },
@@ -39,23 +41,36 @@ BrowserID.Modules.CheckRegistration = (function() {
           });
         }
         else if (status === "mustAuth") {
-          self.close("authenticate", { email: self.email });
+          // if we have a password (because it was just chosen in dialog),
+          // then we can authenticate the user and proceed
+          if (self.password) {
+            user.authenticate(self.email, self.password, function (authenticated) {
+              if (authenticated) {
+                user.syncEmails(function() {
+                  self.close(self.verificationMessage);
+                  oncomplete && oncomplete();
+                });
+              } else {
+                user.addressInfo(self.email, function(info) {
+                  self.close("authenticate", info);
+                });
+              }
+            });
+          } else {
+            user.addressInfo(self.email, function(info) {
+              self.close("authenticate", info);
+            });
+          }
+
           oncomplete && oncomplete();
         }
       }, self.getErrorDialog(errors.registration, oncomplete));
     },
 
     back: function() {
-      // XXX this should change to cancelEmailValidation for email, but this
-      // will work.
       user.cancelUserValidation();
-      this.close("cancel_state");
-    },
-
-    cancel: function() {
-      this.close("cancel");
+      this.publish(this.required ? "cancel" : "cancel_state");
     }
-
   });
 
   return Module;

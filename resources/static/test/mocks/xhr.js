@@ -13,7 +13,8 @@ BrowserID.Mocks.xhr = (function() {
       authenticated: false,
       auth_level: undefined,
       code_version: "ABC123",
-      random_seed: "H+ZgKuhjVckv/H4i0Qvj/JGJEGDVOXSIS5RCOjY9/Bo="
+      random_seed: "H+ZgKuhjVckv/H4i0Qvj/JGJEGDVOXSIS5RCOjY9/Bo=",
+      data_sample_rate: 1
     };
 
   // this cert is meaningless, but it has the right format
@@ -32,7 +33,7 @@ BrowserID.Mocks.xhr = (function() {
       // the flag contextAjaxError.
       "get /wsapi/session_context contextAjaxError": undefined,
       "get /wsapi/email_for_token?token=token valid": { email: "testuser@testuser.com" },
-      "get /wsapi/email_for_token?token=token needsPassword": { email: "testuser@testuser.com", needs_password: true },
+      "get /wsapi/email_for_token?token=token mustAuth": { email: "testuser@testuser.com", must_auth: true },
       "get /wsapi/email_for_token?token=token invalid": { success: false },
       "post /wsapi/authenticate_user valid": { success: true, userid: 1 },
       "post /wsapi/authenticate_user invalid": { success: false },
@@ -46,6 +47,7 @@ BrowserID.Mocks.xhr = (function() {
       "post /wsapi/cert_key invalid": undefined,
       "post /wsapi/cert_key ajaxError": undefined,
       "post /wsapi/complete_email_addition valid": { success: true },
+      "post /wsapi/complete_email_addition missing_password": 401,
       "post /wsapi/complete_email_addition invalid": { success: false },
       "post /wsapi/complete_email_addition ajaxError": undefined,
       "post /wsapi/stage_user unknown_secondary": { success: true },
@@ -54,11 +56,12 @@ BrowserID.Mocks.xhr = (function() {
       "post /wsapi/stage_user throttle": 429,
       "post /wsapi/stage_user ajaxError": undefined,
       "get /wsapi/user_creation_status?email=registered%40testuser.com pending": { status: "pending" },
-      "get /wsapi/user_creation_status?email=registered%40testuser.com complete": { status: "complete" },
+      "get /wsapi/user_creation_status?email=registered%40testuser.com complete": { status: "complete", userid: 4 },
       "get /wsapi/user_creation_status?email=registered%40testuser.com mustAuth": { status: "mustAuth" },
       "get /wsapi/user_creation_status?email=registered%40testuser.com noRegistration": { status: "noRegistration" },
       "get /wsapi/user_creation_status?email=registered%40testuser.com ajaxError": undefined,
       "post /wsapi/complete_user_creation valid": { success: true },
+      "post /wsapi/complete_user_creation missing_password": 401,
       "post /wsapi/complete_user_creation invalid": { success: false },
       "post /wsapi/complete_user_creation ajaxError": undefined,
       "post /wsapi/logout valid": { success: true },
@@ -68,8 +71,10 @@ BrowserID.Mocks.xhr = (function() {
       "get /wsapi/have_email?email=registered%40testuser.com throttle": { email_known: true },
       "get /wsapi/have_email?email=registered%40testuser.com ajaxError": undefined,
       "get /wsapi/have_email?email=unregistered%40testuser.com valid": { email_known: false },
+      "get /wsapi/have_email?email=unregistered%40testuser.com primary": { email_known: false },
       "post /wsapi/remove_email valid": { success: true },
       "post /wsapi/remove_email invalid": { success: false },
+      "post /wsapi/remove_email multiple": { success: true },
       "post /wsapi/remove_email ajaxError": undefined,
       "post /wsapi/account_cancel valid": { success: true },
       "post /wsapi/account_cancel invalid": { success: false },
@@ -81,6 +86,7 @@ BrowserID.Mocks.xhr = (function() {
       "post /wsapi/stage_email throttle": 429,
       "post /wsapi/stage_email ajaxError": undefined,
       "post /wsapi/cert_key ajaxError": undefined,
+      "get /wsapi/email_addition_status?email=testuser%40testuser.com complete": { status: "complete" },
       "get /wsapi/email_addition_status?email=registered%40testuser.com pending": { status: "pending" },
       "get /wsapi/email_addition_status?email=registered%40testuser.com complete": { status: "complete" },
       "get /wsapi/email_addition_status?email=registered%40testuser.com mustAuth": { status: "mustAuth" },
@@ -102,12 +108,14 @@ BrowserID.Mocks.xhr = (function() {
       "post /wsapi/update_password invalid": undefined,
       "get /wsapi/address_info?email=unregistered%40testuser.com invalid": undefined,
       "get /wsapi/address_info?email=unregistered%40testuser.com throttle": { type: "secondary", known: false },
+      "get /wsapi/address_info?email=unregistered%40testuser.com valid": { type: "secondary", known: false },
       "get /wsapi/address_info?email=unregistered%40testuser.com unknown_secondary": { type: "secondary", known: false },
       "get /wsapi/address_info?email=registered%40testuser.com known_secondary": { type: "secondary", known: true },
       "get /wsapi/address_info?email=registered%40testuser.com primary": { type: "primary", auth: "https://auth_url", prov: "https://prov_url" },
       "get /wsapi/address_info?email=unregistered%40testuser.com primary": { type: "primary", auth: "https://auth_url", prov: "https://prov_url" },
       "get /wsapi/address_info?email=testuser%40testuser.com unknown_secondary": { type: "secondary", known: false },
       "get /wsapi/address_info?email=testuser%40testuser.com known_secondary": { type: "secondary", known: true },
+      "get /wsapi/address_info?email=registered%40testuser.com mustAuth": { type: "secondary", known: true },
       "get /wsapi/address_info?email=testuser%40testuser.com primary": { type: "primary", auth: "https://auth_url", prov: "https://prov_url" },
       "get /wsapi/address_info?email=testuser%40testuser.com ajaxError": undefined,
       "post /wsapi/add_email_with_assertion invalid": { success: false },
@@ -115,6 +123,8 @@ BrowserID.Mocks.xhr = (function() {
       "post /wsapi/prolong_session valid": { success: true },
       "post /wsapi/prolong_session unauthenticated": 400,
       "post /wsapi/prolong_session ajaxError": undefined,
+      "post /wsapi/interaction_data valid": { success: true },
+      "post /wsapi/interaction_data ajaxError": undefined
     },
 
     setContextInfo: function(field, value) {

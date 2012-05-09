@@ -27,14 +27,14 @@ BrowserID.Modules.PickEmail = (function() {
   }
 
   function addEmail() {
-    this.close("add_email");
+    this.publish("add_email");
   }
 
   function checkEmail(email) {
     var identity = user.getStoredEmailKeypair(email);
     if (!identity) {
       alert(gettext("The selected email is invalid or has been deleted."));
-      this.close("assertion_generated", {
+      this.publish("assertion_generated", {
         assertion: null
       });
     }
@@ -48,9 +48,6 @@ BrowserID.Modules.PickEmail = (function() {
 
     var valid = checkEmail.call(self, email);
     if (valid) {
-      var origin = user.getOrigin();
-      storage.site.set(origin, "email", email);
-
       self.close("email_chosen", { email: email });
     }
   }
@@ -77,6 +74,10 @@ BrowserID.Modules.PickEmail = (function() {
       var target = dom.getAttr(event.target, "for");
       dom.fireEvent("#" + target, event.type);
     }
+  }
+
+  function notMe() {
+    this.publish("notme");
   }
 
   var Module = bid.Modules.PageModule.extend({
@@ -107,6 +108,7 @@ BrowserID.Modules.PickEmail = (function() {
       // is needed for the label handler so that the correct radio button is
       // selected.
       self.bind("#selectEmail label", "click", proxyEventToInput);
+      self.click("#thisIsNotMe", notMe);
 
       sc.start.call(self, options);
 
@@ -121,7 +123,8 @@ BrowserID.Modules.PickEmail = (function() {
     // BEGIN TESTING API
     ,
     signIn: signIn,
-    addEmail: addEmail
+    addEmail: addEmail,
+    notMe: notMe
     // END TESTING API
   });
 

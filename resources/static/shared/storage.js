@@ -2,15 +2,39 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-BrowserID.Storage = (function() {
+/*globals BrowserID: true, console: true */
 
-  var jwk,
-      storage = localStorage,
-      ONE_DAY_IN_MS = (1000 * 60 * 60 * 24);
+BrowserID.Storage = (function() {
+  "use strict";
+
+  var jwcrypto,
+      ONE_DAY_IN_MS = (1000 * 60 * 60 * 24),
+      storage;
+
+  try {
+    storage = localStorage;
+  }
+  catch(e) {
+    // Fx with cookies disabled will except while trying to access
+    // localStorage.  IE6/IE7 will just plain blow up because they have no
+    // notion of localStorage.  Because of this, and because the new API
+    // requires access to localStorage, create a fake one with removeItem.
+    storage = {
+      removeItem: function(key) {
+        this[key] = null;
+        delete this[key];
+      }
+    };
+  }
+
+  // temporary, replace with helpers.log if storage uses elog long term...
+  function elog (msg) {
+    if (window.console && console.error) console.error(msg);
+  }
 
   function prepareDeps() {
-    if (!jwk) {
-      jwk = require("./jwk");
+    if (!jwcrypto) {
+      jwcrypto = require("./jwcrypto");
     }
   }
 
@@ -49,6 +73,18 @@ BrowserID.Storage = (function() {
     var emails = getEmails();
     emails[email] = obj;
     storeEmails(emails);
+  }
+
+  function addPrimaryEmail(email, obj) {
+    obj = obj || {};
+    obj.type = "primary";
+    addEmail(email, obj);
+  }
+
+  function addSecondaryEmail(email, obj) {
+    obj = obj || {};
+    obj.type = "secondary";
+    addEmail(email, obj);
   }
 
   function removeEmail(email) {
@@ -96,9 +132,10 @@ BrowserID.Storage = (function() {
     storage.tempKeypair = null;
     if (raw_kp) {
       prepareDeps();
-      var kp = new jwk.KeyPair();
-      kp.publicKey = jwk.PublicKey.fromSimpleObject(raw_kp.publicKey);
-      kp.secretKey = jwk.SecretKey.fromSimpleObject(raw_kp.secretKey);
+
+      var kp = {};
+      kp.publicKey = jwcrypto.loadPublicKeyFromObject(raw_kp.publicKey);
+      kp.secretKey = jwcrypto.loadSecretKeyFromObject(raw_kp.secretKey);
       return kp;
     } else {
       return null;
@@ -160,21 +197,21 @@ BrowserID.Storage = (function() {
     }
   }
 
-  function managePageGet(key) {
-    var allInfo = JSON.parse(storage.managePage || "{}");
+  function generic2KeySet(namespace, key, value) {
+    var allInfo = JSON.parse(storage[namespace] || "{}");
+    allInfo[key] = value;
+    storage[namespace] = JSON.stringify(allInfo);
+  }
+
+  function generic2KeyGet(namespace, key) {
+    var allInfo = JSON.parse(storage[namespace] || "{}");
     return allInfo[key];
   }
 
-  function managePageSet(key, value) {
-    var allInfo = JSON.parse(storage.managePage || "{}");
-    allInfo[key] = value;
-    storage.managePage = JSON.stringify(allInfo);
-  }
-
-  function managePageRemove(key) {
-    var allInfo = JSON.parse(storage.managePage || "{}");
+  function generic2KeyRemove(namespace, key) {
+    var allInfo = JSON.parse(storage[namespace] || "{}");
     delete allInfo[key];
-    storage.managePage = JSON.stringify(allInfo);
+    storage[namespace] = JSON.stringify(allInfo);
   }
 
   function setLoggedIn(origin, email) {
@@ -197,7 +234,7 @@ BrowserID.Storage = (function() {
       if (lastState !== currentState) {
         callback();
         lastState = currentState;
-      };
+      }
     }
 
     // IE8 does not have addEventListener, nor does it support storage events.
@@ -241,7 +278,7 @@ BrowserID.Storage = (function() {
         lastUpdated = Date.parse(userInfo.updated);
 
         if (!validState(currentState)) throw "corrupt/outdated";
-        if (NaN === lastUpdated) throw "corrupt/outdated";
+        if (isNaN(lastUpdated)) throw "corrupt/outdated";
       }
     } catch(e) {
       currentState = undefined;
@@ -279,6 +316,10 @@ BrowserID.Storage = (function() {
   }
 
   function shouldAskUserAboutHerComputer(userid) {
+    // if any higher level code passes in a non-userid,
+    // we'll tell them not to ask, triggering ephemeral sessions.
+    if (typeof userid !== 'number') return false;
+
     // we should ask the user if this is their computer if they were
     // first seen over a minute ago, if they haven't denied ownership
     // of this computer in the last 24 hours, and they haven't confirmed
@@ -331,7 +372,7 @@ BrowserID.Storage = (function() {
 
   function clearUsersComputerOwnershipStatus(userid) {
     try {
-      allInfo = JSON.parse(storage.usersComputer);
+      var allInfo = JSON.parse(storage.usersComputer);
       if (typeof allInfo !== 'object') throw 'bogus';
 
       var userInfo = allInfo[userid];
@@ -360,12 +401,72 @@ BrowserID.Storage = (function() {
     storage.emailToUserID = JSON.stringify(allInfo);
   }
 
+  function pushInteractionData(data) {
+    var id;
+    try {
+      id = JSON.parse(storage.interactionData);
+      id.unshift(data);
+    } catch(e) {
+      id = [ data ];
+    }
+    storage.interactionData = JSON.stringify(id);
+  }
+
+  function currentInteractionData() {
+    try {
+      return storage.interactionData ? JSON.parse(storage.interactionData)[0] : {};
+    } catch(e) {
+      elog(e);
+      return {};
+    }
+  }
+
+  function setCurrentInteractionData(data) {
+    var id;
+    try {
+      id = JSON.parse(storage.interactionData);
+      id[0] = data;
+    } catch(e) {
+      elog(e);
+      id = [ data ];
+    }
+    storage.interactionData = JSON.stringify(id);
+  }
+
+  function getAllInteractionData() {
+    try {
+      return storage.interactionData ? JSON.parse(storage.interactionData) : [];
+    } catch(e) {
+      if (window.console && console.error) console.error(e);
+      return [];
+    }
+  }
+
+  function clearInteractionData() {
+    try {
+      storage.interactionData = JSON.stringify([]);
+    } catch(e) {
+      storage.removeItem("interactionData");
+      elog(e);
+    }
+  }
+
   return {
     /**
      * Add an email address and optional key pair.
      * @method addEmail
      */
     addEmail: addEmail,
+    /**
+     * Add a primary address
+     * @method addPrimaryEmail
+     */
+    addPrimaryEmail: addPrimaryEmail,
+    /**
+     * Add a secondary address
+     * @method addSecondaryEmail
+     */
+    addSecondaryEmail: addSecondaryEmail,
     /**
      * Get all email addresses and their associated key pairs
      * @method getEmails
@@ -421,9 +522,53 @@ BrowserID.Storage = (function() {
        * Set a data field for the manage page
        * @method managePage.set
        */
-      set: managePageSet,
-      get: managePageGet,
-      remove: managePageRemove
+      set: generic2KeySet.curry("managePage"),
+      get: generic2KeyGet.curry("managePage"),
+      remove: generic2KeyRemove.curry("managePage")
+    },
+
+    signInEmail: {
+      set: generic2KeySet.curry("main_site", "signInEmail"),
+      get: generic2KeyGet.curry("main_site", "signInEmail"),
+      remove: generic2KeyRemove.curry("main_site", "signInEmail")
+    },
+
+    interactionData: {
+      /**
+       * add a new interaction blob to localstorage, this will *push* any stored
+       * blobs to the 'completed' backlog, and happens when a new dialog interaction
+       * begins.
+       * @param {object} data - an object to push onto the queue
+       * @method interactionData.push()
+       * @returns nada
+       */
+      push: pushInteractionData,
+      /**
+       * read the interaction data blob associated with the current interaction
+       * @method interactionData.current()
+       * @returns a JSON object containing the latest interaction data blob
+       */
+      current: currentInteractionData,
+      /**
+       * overwrite the interaction data blob associated with the current interaction
+       * @param {object} data - the object to overwrite current with
+       * @method interactionData.setCurrent()
+       */
+      setCurrent: setCurrentInteractionData,
+      /**
+       * get all past saved interaction data (returned as a JSON array), excluding
+       * the "current" data (that which is being collected now).
+       * @method interactionData.get()
+       * @returns an array, possibly of length zero if no past interaction data is
+       * available
+       */
+      get: getAllInteractionData,
+      /**
+       * clear all interaction data, except the current, in-progress
+       * collection.
+       * @method interactionData.clear()
+       */
+      clear: clearInteractionData
     },
 
     usersComputer: {

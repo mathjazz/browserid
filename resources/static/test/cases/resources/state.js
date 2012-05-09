@@ -78,10 +78,44 @@
     equal(error, "start: controller must be specified", "creating a state machine without a controller fails");
   });
 
+  test("new_user - call doSetPassword with correct email", function() {
+    mediator.publish("new_user", { email: TEST_EMAIL });
+
+    equal(actions.info.doSetPassword.email, TEST_EMAIL, "correct email sent to doSetPassword");
+  });
+
+  test("cancel new user password_set flow - go back to the authentication screen", function() {
+    mediator.publish("authenticate");
+    mediator.publish("new_user", undefined, { email: TEST_EMAIL });
+    mediator.publish("password_set");
+    actions.info.doAuthenticate = {};
+    mediator.publish("cancel_state");
+    equal(actions.info.doAuthenticate.email, TEST_EMAIL, "authenticate called with the correct email");
+  });
+
+  test("password_set for new user - call doStageUser with correct email", function() {
+    mediator.publish("new_user", { email: TEST_EMAIL });
+    mediator.publish("password_set");
+
+    equal(actions.info.doStageUser.email, TEST_EMAIL, "correct email sent to doStageUser");
+  });
+
+  test("password_set for add secondary email - call doStageEmail with correct email", function() {
+    mediator.publish("add_email_submit_with_secondary", { email: TEST_EMAIL });
+    mediator.publish("password_set");
+
+    equal(actions.info.doStageEmail.email, TEST_EMAIL, "correct email sent to doStageEmail");
+  });
+
+  test("password_set for reset password - call doResetPassword with correct email", function() {
+    mediator.publish("forgot_password", { email: TEST_EMAIL });
+    mediator.publish("password_set");
+
+    equal(actions.info.doResetPassword.email, TEST_EMAIL, "correct email sent to doResetPassword");
+  });
+
   test("user_staged - call doConfirmUser", function() {
-    mediator.publish("user_staged", {
-      email: TEST_EMAIL
-    });
+    mediator.publish("user_staged", { email: TEST_EMAIL });
 
     equal(actions.info.doConfirmUser.email, TEST_EMAIL, "waiting for email confirmation for testuser@testuser.com");
   });
@@ -93,10 +127,21 @@
     equal(actions.info.doConfirmUser.required, true, "doConfirmUser called with required flag");
   });
 
-  test("user_confirmed - call doEmailConfirmed", function() {
-    mediator.publish("user_confirmed");
+  test("user_confirmed - redirect to email_chosen", function() {
+    mediator.subscribe("email_chosen", function(msg, info) {
+      equal(info.email, TEST_EMAIL, "correct email passed");
+      start();
+    });
 
-    ok(actions.called.doEmailConfirmed, "user was confirmed");
+    // simulate the flow of a user being staged through to confirmation. Since
+    // we are not actually doing the middle bits and saving off a cert for the
+    // email address, we get an invalid email exception thrown.
+    mediator.publish("user_staged", { email: TEST_EMAIL });
+    try {
+      mediator.publish("user_confirmed");
+    } catch(e) {
+      equal(e.toString(), "invalid email", "expected failure");
+    }
   });
 
   test("email_staged - call doConfirmEmail", function() {
@@ -112,10 +157,13 @@
     equal(actions.info.doConfirmEmail.required, true, "doConfirmEmail called with required flag");
   });
 
-  test("primary_user with already provisioned primary user - call doEmailChosen", function() {
+  asyncTest("primary_user with already provisioned primary user - redirect to primary_user_ready", function() {
     storage.addEmail(TEST_EMAIL, { type: "primary", cert: "cert" });
+    mediator.subscribe("primary_user_ready", function(msg, info) {
+      equal(info.email, TEST_EMAIL, "primary_user_ready triggered with correct email");
+      start();
+    });
     mediator.publish("primary_user", { email: TEST_EMAIL });
-    ok(actions.called.doEmailChosen, "doEmailChosen called");
   });
 
   test("primary_user with unprovisioned primary user - call doProvisionPrimaryUser", function() {
@@ -198,21 +246,37 @@
     equal(actions.info.doForgotPassword.requiredEmail, true, "correct requiredEmail passed");
   });
 
-  test("reset_password - call doResetPassword", function() {
-    // XXX how is this different from forgot_password?
-    mediator.publish("reset_password", {
+  test("password_reset to user_confirmed - call doUserStaged then doEmailConfirmed", function() {
+    // password_reset indicates the user has verified that they want to reset
+    // their password.
+    mediator.publish("password_reset", {
       email: TEST_EMAIL
     });
-    equal(actions.info.doResetPassword.email, TEST_EMAIL, "reset password with the correct email");
+    equal(actions.info.doConfirmUser.email, TEST_EMAIL, "doConfirmUser with the correct email");
+
+    // At this point the user should be displayed the "go confirm your address"
+    // screen.
+
+    // user_confirmed means the user has confirmed their email and the dialog
+    // has received the "complete" message from /wsapi/user_creation_status.
+    try {
+      mediator.publish("user_confirmed");
+    } catch(e) {
+      // Exception is expected because as part of the user confirmation
+      // process, before user_confirmed is called, email addresses are synced.
+      // Addresses are not synced in this test.
+      equal(e.toString(), "invalid email", "expected failure");
+    }
   });
 
-  test("cancel reset_password flow - go two steps back", function() {
+
+  test("cancel password_reset flow - go two steps back", function() {
     // we want to skip the "verify" screen of reset password and instead go two
     // screens back.  Do do this, we are simulating the steps necessary to get
-    // to the reset_password flow.
+    // to the password_reset flow.
     mediator.publish("authenticate");
     mediator.publish("forgot_password", undefined, { email: TEST_EMAIL });
-    mediator.publish("reset_password");
+    mediator.publish("password_reset");
     actions.info.doAuthenticate = {};
     mediator.publish("cancel_state");
     equal(actions.info.doAuthenticate.email, TEST_EMAIL, "authenticate called with the correct email");
@@ -228,7 +292,20 @@
     });
   });
 
-  asyncTest("assertion_generated with assertion, need to ask user whether it's their computer - redirect to is_this_your_computer", function() {
+  test("assertion_generated with assertion - doAssertionGenerated called", function() {
+    setContextInfo("password");
+    storage.addEmail(TEST_EMAIL, {});
+    mediator.publish("assertion_generated", {
+      assertion: "assertion"
+    });
+
+    equal(actions.info.doAssertionGenerated.assertion, "assertion",
+        "doAssertionGenerated called with assertion");
+  });
+
+
+
+  asyncTest("email_valid_and_ready, need to ask user whether it's their computer - redirect to is_this_your_computer", function() {
     setContextInfo("password");
     storage.usersComputer.forceAsk(network.userid());
     mediator.subscribe("is_this_your_computer", function() {
@@ -236,31 +313,37 @@
       start();
     });
 
-    mediator.publish("assertion_generated", {
+    mediator.publish("email_valid_and_ready", {
       assertion: "assertion"
     });
   });
 
-  test("assertion_generated with assertion, do not ask user whether it's their computer - doAssertionGenerated called", function() {
+  test("email_valid_and_ready, do not need to ask user whether it's their computer - redirect to email_ready", function() {
     setContextInfo("password");
     // First, set up the context info for the email.
 
     storage.addEmail(TEST_EMAIL, {});
-    mediator.publish("email_chosen", { email: TEST_EMAIL });
-    mediator.publish("assertion_generated", {
-      assertion: "assertion"
+    mediator.subscribe("email_ready", function() {
+      ok(true, "redirect to email_ready");
+      start();
     });
-
-    equal(actions.info.doAssertionGenerated.assertion, "assertion",
-        "doAssertionGenerated called with assertion");
-    equal(actions.info.doAssertionGenerated.email, TEST_EMAIL,
-        "doAssertionGenerated called with email");
+    mediator.publish("email_valid_and_ready", { email: TEST_EMAIL });
   });
 
   test("email_confirmed", function() {
-    mediator.publish("email_confirmed");
-
-    ok(actions.called.doEmailConfirmed, "user has confirmed the email");
+    mediator.subscribe("email_chosen", function(msg, info) {
+      equal(info.email, TEST_EMAIL, "correct email passed");
+      start();
+    });
+    mediator.publish("email_staged", { email: TEST_EMAIL });
+    // simulate the flow of a user being staged through to confirmation. Since
+    // we are not actually doing the middle bits and saving off a cert for the
+    // email address, we get an invalid email exception thrown.
+    try {
+      mediator.publish("email_confirmed");
+    } catch(e) {
+      equal(e.toString(), "invalid email", "expected failure");
+    }
   });
 
   test("cancel_state goes back to previous state if available", function() {
@@ -347,17 +430,17 @@
     });
   });
 
-  asyncTest("email_chosen with secondary email, user authenticated to secondary - call doEmailChosen", function() {
-    var email = TEST_EMAIL;
-    storage.addEmail(email, { type: "secondary" });
+  asyncTest("email_chosen with secondary email, user authenticated to secondary - redirect to email_valid_and_ready", function() {
+    storage.addEmail(TEST_EMAIL, { type: "secondary" });
     xhr.setContextInfo("auth_level", "password");
 
+    mediator.subscribe("email_valid_and_ready", function(msg, info) {
+      equal(info.email, TEST_EMAIL, "correctly redirected to email_valid_and_ready with correct email");
+      start();
+    });
+
     mediator.publish("email_chosen", {
-      email: email,
-      complete: function() {
-        equal(actions.called.doEmailChosen, true, "doEmailChosen called");
-        start();
-      }
+      email: TEST_EMAIL
     });
   });
 
@@ -401,5 +484,36 @@
     equal(actions.info.doPickEmail.privacyURL, "http://example.com/priv.html", "privacyURL preserved");
     equal(actions.info.doPickEmail.tosURL, "http://example.com/tos.html", "tosURL preserved");
   });
+
+  test("add_email - call doAddEmail", function() {
+    mediator.publish("add_email", {
+      complete: function() {
+        equal(actions.called.doAddEmail, true, "doAddEmail called");
+        start();
+      }
+    });
+  });
+
+  test("add_email_submit_with_secondary - first secondary email - call doSetPassword", function() {
+    mediator.publish("add_email", {
+      complete: function() {
+        equal(actions.called.doSetPassword, true, "doSetPassword called");
+        start();
+      }
+    });
+  });
+
+
+  test("add_email_submit_with_secondary - second secondary email - call doStageEmail", function() {
+    storage.addSecondaryEmail("testuser@testuser.com");
+
+    mediator.publish("add_email", {
+      complete: function() {
+        equal(actions.called.doStageEmail, true, "doStageEmail called");
+        start();
+      }
+    });
+  });
+
 
 }());
